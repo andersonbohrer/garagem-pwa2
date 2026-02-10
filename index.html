@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Garagem</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2c3e50">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 { margin-top: 0; }
+
+    .card {
+      background: #fff;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.1);
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .on { color: green; }
+    .off { color: red; }
+
+    button {
+      padding: 10px 14px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn-on {
+      background: #2ecc71;
+      color: white;
+    }
+
+    .btn-off {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .small {
+      color: #666;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🏠 Garagem</h1>
+
+<div class="card">
+  Pergolado: <span id="pergolado" class="status">---</span><br><br>
+  <button class="btn-on" onclick="cmd({pergolado:'ON'})">Ligar</button>
+  <button class="btn-off" onclick="cmd({pergolado:'OFF'})">Desligar</button>
+</div>
+
+<div class="card">
+  Jardim dos fundos: <span id="jardim" class="status">---</span><br><br>
+  <button class="btn-on" onclick="cmd({jardim_fundos:'ON'})">Ligar</button>
+  <button class="btn-off" onclick="cmd({jardim_fundos:'OFF'})">Desligar</button>
+</div>
+
+<div class="card">
+  Temperatura: <span id="temp">--</span> °C<br>
+  Wi-Fi: <span id="wifi">--</span> dBm<br>
+  <span class="small">Boot count: <span id="boot">--</span></span>
+</div>
+
+<div class="card">
+  MQTT: <span id="mqtt">Conectando…</span>
+</div>
+
+<!-- MQTT Paho LOCAL (sem CDN, sem CSP quebrar) -->
+<script src="paho-mqtt.min.js"></script>
+
+<script>
+  const clientId = "web_" + Math.random().toString(16).substr(2, 8);
+
+  const client = new Paho.MQTT.Client(
+    "3e533850c6644a06ac4bf2bfe62a37f3.s1.eu.hivemq.cloud",
+    8884,
+    "/mqtt",
+    clientId
+  );
+
+  client.onConnectionLost = function () {
+    document.getElementById("mqtt").innerText = "Desconectado";
+  };
+
+  client.onMessageArrived = function (message) {
+    const s = JSON.parse(message.payloadString);
+
+    setStatus("pergolado", s.pergolado);
+    setStatus("jardim", s.jardim_fundos);
+
+    document.getElementById("temp").innerText = s.temperatura;
+    document.getElementById("wifi").innerText = s.wifi_dbm;
+    document.getElementById("boot").innerText = s.boot_count;
+  };
+
+  client.connect({
+    useSSL: true,
+    userName: "bohrer01",
+    password: "2156!ldjf@Q",
+    onSuccess: function () {
+      document.getElementById("mqtt").innerText = "Conectado";
+      client.subscribe("garagem/state");
+    },
+    onFailure: function () {
+      document.getElementById("mqtt").innerText = "Falha MQTT";
+    }
+  });
+
+  function setStatus(id, value) {
+    const el = document.getElementById(id);
+    el.innerText = value;
+    el.className = "status " + (value === "ON" ? "on" : "off");
+  }
+
+  function cmd(payload) {
+    const msg = new Paho.MQTT.Message(JSON.stringify(payload));
+    msg.destinationName = "garagem/command";
+    client.send(msg);
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js");
+  }
+</script>
+
+</body>
+</html>
